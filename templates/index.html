@@ -11,9 +11,18 @@
 			.fields input {
 				display: block;
 			}
+			p::first-letter {
+				color: red;
+				font-size:1.1em;
+			}
 		</style>
 	</head>
-	<body><!-- CRUD -->
+	<body>
+		<div id='top'>
+			<p>Дополнительная информация имеется в консоле браузера</p>
+			<p></p>
+		</div>
+		<!-- CRUD -->
 		<div class='fields'>
 			<section id='create'>
 				<form id='createForm'>
@@ -67,11 +76,14 @@
 				/* DEL BUTTON logic*/
 				delButton.onclick = async () => {
 					const qsoID = parseInt(document.getElementById('qsoDeleteID').value);
-					if(!qsoID || qsoID < 0) {
+					if(qsoID < 0) {
 						return alert("Плохой ID")
 					}
 					// XSS?
-					const res = await fetch(`/api/QSOdel/${qsoID}`)
+					const res = await fetch(`/api/QSOdel/${qsoID}`,
+					{
+						method: "DELETE"
+					})
 					if (res.ok) {
 						res.json().then((js) => {
 							console.log(js)
@@ -86,7 +98,7 @@
 				updateButton.onclick = async() => {
 					/* TODO: обновить запись */
 						const qsoID = parseInt(document.getElementById('qsoUpdateID').value);
-						if(!qsoID || qsoID < 0) {
+						if(qsoID < 0) {
 							return alert("Плохой ID")
 						}
 						const data = {

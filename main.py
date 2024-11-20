@@ -49,9 +49,9 @@ def index():
 @app.route('/api/QSOdel/<int:qso_id>', methods=["DELETE"])
 def delete(qso_id):
    if qso_id < 0 or qso_id >= len(QSO):
-       return jsonify({"error": "bad qso id"})
+       return jsonify({"error": "bad qso id"}), 404
    QSO.pop(qso_id)
-   return jsonify({"ok": True, "message": "did drop"})
+   return jsonify({"ok": True, "message": "did drop"}), 201
 '''
 Обновление записи
 Принимает данные в JSON callsignA - свой позывной,callsignB - чужой позывной,rsta - RST ведущего,rstb - RST второго кореспондента
