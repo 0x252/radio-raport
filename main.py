@@ -4,14 +4,10 @@
 import time, redis, os
 from app import createApp as app 
 from flask_socketio import SocketIO, emit, send
+from dotenv import load_dotenv 
+load_dotenv()
 
-app = app(redisClient=redis.Redis(
-                host=os.getenv("REDIS_HOST"),
-                port=os.getenv("REDIS_PORT"),
-                password=os.getenv("REDIS_PASSWORD"),
-                decode_responses=True
-                )
-          )
+app = app()
 
 socketio = SocketIO(app)
 @socketio.on('message')

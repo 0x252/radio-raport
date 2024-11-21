@@ -1,25 +1,27 @@
 # init dotenv
-from dotenv import load_dotenv 
 from flask import Flask, render_template, request, jsonify
 from utils import isValidCallSign
 import json, os, re
 from models import QSOField
+from redisClient import RedisSingleton
 
 #TODO: redisClient to globalVar/to a class
 def getQSOs(redisClient):
-    qso_list = redisClient.lrange(QSOField.REDIS_KEY, 0, -1)
+    qso_list = redisClient.client.lrange(QSOField.REDIS_KEY, 0, -1)
     return qso_list
 
 #TODO: redisClient to globalVar/to a class
 def addQSO(redisClient,callsignA, callsignB, rsta, rstb):
     newField = QSOField.QSOField(callsignA, callsignB, rsta, rstb)
-    redisClient.rpush(QSOField.REDIS_KEY, newField.json)
+    redisClient.client.rpush(QSOField.REDIS_KEY, newField.json)
 
 
-def createApp(port=8080, static_url_path='',static_folder='static', template_folder='templates', redisClient=None):
+def createApp(port=8080, static_url_path='',static_folder='static', template_folder='templates'):
+    redisClient = RedisSingleton()
+
     app = Flask(__name__, static_url_path=static_url_path,static_folder=static_folder, template_folder=template_folder)
     def isValidCallSigns(a,b): return all([isValidCallSign(a),isValidCallSign(b)])
-    load_dotenv()
+    
 #TODO: app.routes to routes directory
     @app.route('/')
     def index():
@@ -30,7 +32,7 @@ def createApp(port=8080, static_url_path='',static_folder='static', template_fol
         qso_list = getQSOs(redisClient)
         if qso_id < 0 or qso_id >= len(qso_list):
             return jsonify({"error": "bad qso id"}), 404
-        redisClient.lrem(QSOField.REDIS_KEY, 0, qso_list[qso_id])
+        redisClient.client.lrem(QSOField.REDIS_KEY, 0, qso_list[qso_id])
         return jsonify({"ok": True, "message": "did drop"}), 201
 
     @app.route("/api/QSOPut/<int:qso_id>", methods=["PUT"])
@@ -54,7 +56,7 @@ def createApp(port=8080, static_url_path='',static_folder='static', template_fol
         qso_data['callsignB'] = callsignB
         qso_data['rsta'] = data.get('RSTA', qso_data['rsta'])
         qso_data['rstb'] = data.get('RSTB', qso_data['rstb'])
-        redisClient.lset(QSOField.REDIS_KEY, qso_id, json.dumps(qso_data))
+        redisClient.client.lset(QSOField.REDIS_KEY, qso_id, json.dumps(qso_data))
         #QSO[qso_id].timestamp = time.time() 
         return jsonify({"ok": True, "message": "QSO updated"}), 200
 
