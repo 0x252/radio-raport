@@ -3,17 +3,25 @@
 '''
 DEBUG_ENABLED = True
 
-# Importing flask module in the project is mandatory
-# An object of Flask class is our WSGI application.
 from flask import Flask, render_template, request, jsonify
-import json, time
+import time, redis, json, os
+
+# init dotenv
+from dotenv import load_dotenv 
+load_dotenv()
+# initRedis
+QSO_KEY = "qso_list"
+redisClient = redis.Redis(
+  host=os.getenv("REDIS_HOST"),
+  port=os.getenv("REDIS_PORT"),
+  password=os.getenv("REDIS_PASSWORD"),
+  decode_responses=True
+  )
 
 # TODO: To an another a file
 def debug(*args): # va_list
     if DEBUG_ENABLED:
         print(args)
-# GLOBAL VARS
-QSO = []
 # Structures
 class QSOField:
     def __init__(self, callsignA, callsignB, rsta, rstb):
@@ -30,7 +38,13 @@ class QSOField:
             "rstb": self.rstb,
             "timestamp": self.timestamp
         }
+    def to_json(self):
+        return json.dumps(self.to_dict())
 #
+# No REST
+# GLOBAL VARS
+QSO = []
+
 app = Flask(__name__, static_url_path='',static_folder='static', template_folder='templates')
 
 '''
@@ -48,9 +62,11 @@ def index():
 '''
 @app.route('/api/QSOdel/<int:qso_id>', methods=["DELETE"])
 def delete(qso_id):
-   if qso_id < 0 or qso_id >= len(QSO):
+   qso_list = redisClient.lrange(QSO_KEY, 0, -1)
+
+   if qso_id < 0 or qso_id >= len(qso_list):
        return jsonify({"error": "bad qso id"}), 404
-   QSO.pop(qso_id)
+   redisClient.lrem(QSO_KEY, 0, qso_list[qso_id])
    return jsonify({"ok": True, "message": "did drop"}), 201
 '''
 Обновление записи
@@ -58,17 +74,20 @@ def delete(qso_id):
 '''
 @app.route("/api/QSOPut/<int:qso_id>", methods=["PUT"])
 def put(qso_id):
-    if qso_id < 0 or qso_id >= len(QSO):
+    qso_list = redisClient.lrange(QSO_KEY, 0, -1)
+
+    if qso_id < 0 or qso_id >= len(qso_list):
         return jsonify({"error": "QSO not found"}), 404
 
     data = request.get_json()
     if not data:
         return jsonify({"error": "Invalid data"}), 400
-
-    QSO[qso_id].callsignA = data.get('callsignA', QSO[qso_id].callsignA)
-    QSO[qso_id].callsignB = data.get('callsignB', QSO[qso_id].callsignB)
-    QSO[qso_id].rsta = data.get('RSTA', QSO[qso_id].rsta)
-    QSO[qso_id].rstb = data.get('RSTB', QSO[qso_id].rstb)
+    qso_data = json.loads(qso_list[qso_id])
+    qso_data['callsignA'] = data.get('callsignA', qso_data['callsignA'])
+    qso_data['callsignB'] = data.get('callsignB', qso_data['callsignB'])
+    qso_data['rsta'] = data.get('RSTA', qso_data['rsta'])
+    qso_data['rstb'] = data.get('RSTB', qso_data['rstb'])
+    redisClient.lset(QSO_KEY, qso_id, json.dumps(qso_data))
     #QSO[qso_id].timestamp = time.time() 
     return jsonify({"ok": True, "message": "QSO updated"}), 200
 
@@ -77,9 +96,12 @@ def put(qso_id):
 '''
 @app.route('/api/QSO', methods=['GET'])
 def getQSO():
+    qso_list = redisClient.lrange(QSO_KEY, 0, -1)
     offset = request.args.get('offset', default=0, type=int)
     limit = request.args.get('limit', default=10, type=int)
-    QSOs = [qso.to_dict() for qso in QSO[offset:offset+limit]]
+    if limit > int(os.getenv("QSO_LIMIT")):
+        limit = int(os.getenv("QSO_LIMIT"))
+    QSOs = [json.loads(qso) for qso in qso_list[offset:offset+limit]]
     return jsonify({
         "offset": offset,
         "limit": limit,
@@ -104,7 +126,7 @@ def add_qso():
         return jsonify({"error":"not enough data"})
     debug("[ADD]: add QSO")
     newField = QSOField(callsignA, callsignB, rsta, rstb)
-    QSO.append(newField)
+    redisClient.rpush(QSO_KEY, newField.to_json())
     return jsonify({
         "id": len(QSO)-1,
         "ok": True
