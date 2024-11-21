@@ -1,21 +1,18 @@
 import redis, os
 class RedisSingleton:
-    _i = None
-    def __new__(c):
-        if c._i is None:
-            c._i = super(RedisSingleton, c).__new__(c) 
-            c._i.client_ = redis.Redis(
-                host=os.getenv("REDIS_HOST"),
-                port=os.getenv("REDIS_PORT"),
+    _instance = None  
+
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls) 
+            cls._instance._client = redis.Redis(
+                host=os.getenv("REDIS_HOST", "localhost"), 
+                port=int(os.getenv("REDIS_PORT", 6379)),
                 password=os.getenv("REDIS_PASSWORD"),
                 decode_responses=True
-                )
-            return c._i
-        return c._i
-        
-    def get_client(s):
-        return s._i.client
+            )
+        return cls._instance
+
     @property
-    def client(s):
-        return s._i.client_
-    
+    def client(self):
+        return self._client
