@@ -1,4 +1,5 @@
-import json
+import json,time
+
 REDIS_KEY = "qso_list"
 
 class QSOField:    

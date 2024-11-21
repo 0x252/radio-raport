@@ -1,7 +1,7 @@
 # init dotenv
 from dotenv import load_dotenv 
 from flask import Flask, render_template, request, jsonify
-from utils import debug, isValidCallSign
+from utils import isValidCallSign
 import json, os, re
 from models import QSOField
 
@@ -12,7 +12,7 @@ def getQSOs(redisClient):
 
 #TODO: redisClient to globalVar/to a class
 def addQSO(redisClient,callsignA, callsignB, rsta, rstb):
-    newField = QSOField(callsignA, callsignB, rsta, rstb)
+    newField = QSOField.QSOField(callsignA, callsignB, rsta, rstb)
     redisClient.rpush(QSOField.REDIS_KEY, newField.json)
 
 
@@ -90,13 +90,12 @@ def createApp(port=8080, static_url_path='',static_folder='static', template_fol
             }),403
         rsta  = data.get('RSTA')
         rstb = data.get('RSTB')
-        debug(f"[ADD]: {callsignA} {rsta} - {callsignB} ({rstb})")
+        print(f"[ADD]: {callsignA} {rsta} - {callsignB} ({rstb})")
         if not(all([callsignA, callsignB, rsta, rstb])):
             return jsonify({"error":"not enough data"})
-        debug("[ADD]: add QSO")
+        addQSO(redisClient,callsignA, callsignB, rsta, rstb)
         qso_list = getQSOs(redisClient)
-
-        QSOs = [json.loads(qso) for qso in qso_list[offset:offset+limit]]
+        QSOs = [json.loads(qso) for qso in qso_list[:]]
         return jsonify({
             "id": len(QSOs)-1,
             "ok": True
