@@ -10,14 +10,8 @@ import time
 from routes.qso import qso
 from routes.radio_signals import rsignal
 
-def getQSOs(offset=0, limit=os.getenv("QSO_LIMIT")):
-    db = DB()
-    qso_list = db.query(QSOField).offset(offset).limit(int(limit)).all()
-    return qso_list
-
-
 def createApp(port=8080, static_url_path='',static_folder='static', template_folder='templates'):
-    redisClient = RedisSingleton()
+    #redisClient = RedisSingleton()
 
     app = Flask(__name__, static_url_path=static_url_path,static_folder=static_folder, template_folder=template_folder)
     
