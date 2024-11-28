@@ -2,18 +2,15 @@
 from flask import Flask, render_template, request, jsonify
 from utils import isValidCallSign
 import json, os, re
-from models import QSOField
+from models.QSOField import QSOField
 from redisClient import RedisSingleton
+from DB import DB
+import time
 
-#TODO: redisClient to globalVar/to a class
-def getQSOs(redisClient):
-    qso_list = redisClient.client.lrange(QSOField.REDIS_KEY, 0, -1)
+def getQSOs(offset=0, limit=os.getenv("QSO_LIMIT")):
+    db = DB()
+    qso_list = db.query(QSOField).offset(offset).limit(int(limit)).all()
     return qso_list
-
-#TODO: redisClient to globalVar/to a class
-def addQSO(redisClient,callsignA, callsignB, rsta, rstb):
-    newField = QSOField.QSOField(callsignA, callsignB, rsta, rstb)
-    redisClient.client.rpush(QSOField.REDIS_KEY, newField.json)
 
 
 def createApp(port=8080, static_url_path='',static_folder='static', template_folder='templates'):
@@ -29,47 +26,55 @@ def createApp(port=8080, static_url_path='',static_folder='static', template_fol
 
     @app.route('/api/QSOdel/<int:qso_id>', methods=["DELETE"])
     def delete(qso_id):
-        qso_list = getQSOs(redisClient)
-        if qso_id < 0 or qso_id >= len(qso_list):
-            return jsonify({"error": "bad qso id"}), 404
-        redisClient.client.lrem(QSOField.REDIS_KEY, 0, qso_list[qso_id])
-        return jsonify({"ok": True, "message": "did drop"}), 201
+        db = DB()
+        qso = db.query(QSOField).get(qso_id)
+        if not qso:
+            return jsonify({"error": "Not found QSO"})
+        db.session.delete(qso)
+        db.session.commit()
+        return jsonify({"ok": True, "message": "did drop"}), 200
 
     @app.route("/api/QSOPut/<int:qso_id>", methods=["PUT"])
     def put(qso_id):
-        qso_list = getQSOs(redisClient)
-        if qso_id < 0 or qso_id >= len(qso_list):
-            return jsonify({"error": "QSO not found"}), 404
+        db = DB()
+        qso = db.query(QSOField).get(qso_id)
+        
+        if not qso:
+            return jsonify({"error": "QSO not found"}), 404 
 
         data = request.get_json()
         if not data:
-            return jsonify({"error": "Invalid data"}), 400
-        qso_data = json.loads(qso_list[qso_id])
-        callsignA = data.get('callsignA', qso_data['callsignA'])
-        callsignB = data.get('callsignB', qso_data['callsignB'])
-        #TODO: Refactoring logic
-        if not isValidCallSigns(callsignA,callsignB):
-            return jsonify({
-                "error": "not valid callsign"
-            }),403
-        qso_data['callsignA'] = callsignA
-        qso_data['callsignB'] = callsignB
-        qso_data['rsta'] = data.get('RSTA', qso_data['rsta'])
-        qso_data['rstb'] = data.get('RSTB', qso_data['rstb'])
-        redisClient.client.lset(QSOField.REDIS_KEY, qso_id, json.dumps(qso_data))
-        #QSO[qso_id].timestamp = time.time() 
+            return jsonify({"error": "Invalid data"}), 400  
+        
+ 
+        callsignA = data.get('callsignA', qso.callsignA)  
+        callsignB = data.get('callsignB', qso.callsignB)
+
+        
+        if not isValidCallSigns(callsignA, callsignB):
+            return jsonify({"error": "Invalid callsign"}), 403
+        
+        
+        qso.callsignA = callsignA
+        qso.callsignB = callsignB
+        qso.rsta = data.get('RSTA', qso.rsta)
+        qso.rstb = data.get('RSTB', qso.rstb)
+
+        
+        db.session.commit()
+        
         return jsonify({"ok": True, "message": "QSO updated"}), 200
 
 
     @app.route('/api/QSO', methods=['GET'])
     def getQSO():
-        qso_list = getQSOs(redisClient)
         offset = request.args.get('offset', default=0, type=int)
         limit = request.args.get('limit', default=10, type=int)
         if limit > int(os.getenv("QSO_LIMIT")):
             limit = int(os.getenv("QSO_LIMIT"))
-
-        QSOs = {id:json.loads(qso) for qso,id in zip(qso_list[:], range(0,offset+limit))}
+        qso_list = getQSOs(offset, limit)
+        print(qso_list)
+        QSOs = {qso.id: json.loads(qso.json) for qso in qso_list}
 
         return jsonify({
             "offset": offset,
@@ -95,11 +100,19 @@ def createApp(port=8080, static_url_path='',static_folder='static', template_fol
         print(f"[ADD]: {callsignA} {rsta} - {callsignB} ({rstb})")
         if not(all([callsignA, callsignB, rsta, rstb])):
             return jsonify({"error":"not enough data"})
-        addQSO(redisClient,callsignA, callsignB, rsta, rstb)
-        qso_list = getQSOs(redisClient)
-        QSOs = [json.loads(qso) for qso in qso_list[:]]
+        new_qso = QSOField(
+            callsignA=data['callsignA'],
+            callsignB=data['callsignB'],
+            rsta=data['RSTA'],
+            rstb=data['RSTB'],
+            timestamp=time.time()
+        )
+        db = DB()
+        db.session.add(new_qso)
+        db.session.commit()
+        count = db.query(QSOField).count()
         return jsonify({
-            "id": len(QSOs)-1,
+            "id": count-1,
             "ok": True
         }), 201
     return app

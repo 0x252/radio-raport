@@ -24,7 +24,7 @@ services:
       - .:/app
     working_dir: /app
     environment:
-      - DATABASE_URL=postgresql://raport000:raport000@db/mydatabase
+      - DATABASE_URL=postgresql://raport000:raport000@db/raport
       - REDIS_URL=redis://redis:6379
     ports:
       - "5000:5000"  

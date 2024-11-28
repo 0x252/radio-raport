@@ -2,3 +2,5 @@ redis
 flask 
 python-dotenv
 flask-socketio
+SQLAlchemy
+psycopg2-binary
