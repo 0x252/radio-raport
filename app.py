@@ -21,5 +21,5 @@ def createApp(port=8080, static_url_path='',static_folder='static', template_fol
 #TODO: app.routes to routes directory
     @app.route('/')
     def index():
-        return render_template('index.html')
+        return jsonify({"ok":"ok"}), 200 #render_template('index.html')
     return app

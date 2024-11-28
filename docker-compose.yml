@@ -16,7 +16,16 @@ services:
     container_name: redis-container
     ports:
       - "6379:6379"
-
+  nginx:
+        image: nginx:latest
+        container_name: nginx-container
+        volumes:
+          - ./webserv:/usr/share/nginx/html  # Путь до статики (например, фронтенд React)
+          - ./nginx.conf:/etc/nginx/nginx.conf  # Конфигурация для Nginx
+        ports:
+          - "80:80"  # Публичный порт
+        depends_on:
+          - app
   app:
     build: .
     container_name: python-app
@@ -31,6 +40,7 @@ services:
     depends_on:
       - db
       - redis
+    
 
 volumes:
   postgres_data:
