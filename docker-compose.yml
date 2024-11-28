@@ -1,0 +1,36 @@
+services:
+  db:
+    image: postgres:13
+    container_name: psql-container
+    environment:
+      POSTGRES_USER: raport000
+      POSTGRES_PASSWORD: raport000
+      POSTGRES_DB: raport
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+  
+  redis:
+    image: redis:6
+    container_name: redis-container
+    ports:
+      - "6379:6379"
+
+  app:
+    build: .
+    container_name: python-app
+    volumes:
+      - .:/app
+    working_dir: /app
+    environment:
+      - DATABASE_URL=postgresql://raport000:raport000@db/mydatabase
+      - REDIS_URL=redis://redis:6379
+    ports:
+      - "5000:5000"  
+    depends_on:
+      - db
+      - redis
+
+volumes:
+  postgres_data:
